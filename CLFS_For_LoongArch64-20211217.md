@@ -148,8 +148,10 @@ export DOWNLOADDIR="${SYSDIR}/downloads"
 export LC_ALL=POSIX
 export CROSS_HOST="$(echo $MACHTYPE | sed "s/$(echo $MACHTYPE | cut -d- -f2)/cross/")"
 export CROSS_TARGET="loongarch64-unknown-linux-gnu"
-export MABI="lp64"
-export BUILD64="-mabi=lp64"
+#export MABI="lp64d"
+#export BUILD64="-mabi=lp64d"
+export MABI="lp64d"
+export BUILD64="-mabi=lp64d"
 export PATH=${SYSDIR}/cross-tools/bin:/bin:/usr/bin
 unset CFLAGS
 unset CXXFLAGS
@@ -227,7 +229,7 @@ pushd ${SYSDIR}/downloads
 　　**Automake:** https://ftp.gnu.org/gnu/automake/automake-1.16.3.tar.xz  
 　　**Bash:** https://ftp.gnu.org/gnu/bash/bash-5.1.8.tar.gz  
 　　**BC:** https://github.com/gavinhoward/bc/releases/download/4.0.2/bc-4.0.2.tar.xz  
-　　**Binutils:** ```https://github.com/loongarch/binutils-gdb.git  分支名“loongarch/upstream_v6_a1d65b3”```  
+　　**Binutils:** ```https://github.com/loongarch/binutils-gdb.git  分支名“upstream_v3.1”```  
 　　**Bison:** https://ftp.gnu.org/gnu/bison/bison-3.7.6.tar.xz  
 　　**Boost:** https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/boost_1_77_0.tar.bz2  
 　　**Bzip2:** https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz  
@@ -431,23 +433,24 @@ popd
 　　Binutils需要进行扩充式移植的软件包，在没有软件官方支持的情况下需要专门的获取代码的方式进行，以下是获取方式：
 
 ```sh
-git clone https://github.com/loongson/binutils-gdb.git -b loongarch/upstream_v6_a1d65b3 --depth 1
+git clone https://github.com/loongson/binutils-gdb.git -b upstream_v3.1 --depth 1
+
 pushd binutils-gdb
-    git archive --format=tar --output ../binutils-2.37.tar "loongarch/upstream_v6_a1d65b3"
+    git archive --format=tar --output ../binutils-3.1.tar "upstream_v3.1"
 popd
-mkdir binutils-2.37
-pushd binutils-2.37
-    tar xvf ../binutils-2.37.tar
+mkdir binutils-3.1
+pushd binutils-3.1
+    tar xvf ../binutils-3.1.tar
 popd
-tar -czf ${DOWNLOADDIR}/binutils-2.37.tar.gz binutils-2.37
+tar -czf ${DOWNLOADDIR}/binutils-3.1.tar.gz binutils-3.1
 ```
 
 * 制作步骤  
 　　按以下步骤制作交叉编译工具链中的Binutils并安装到存放交叉工具链的目录中。
 
 ```sh
-tar xvf ${DOWNLOADDIR}/binutils-2.37.tar.gz -C ${BUILDDIR}
-pushd ${BUILDDIR}/binutils-2.37
+tar xvf ${DOWNLOADDIR}/binutils-3.1.tar.gz -C ${BUILDDIR}
+pushd ${BUILDDIR}/binutils-3.1
 	rm -rf gdb* libdecnumber readline sim
 	mkdir build
 	cd build
@@ -456,7 +459,7 @@ pushd ${BUILDDIR}/binutils-2.37
 	             --target=${CROSS_TARGET} --with-sysroot=${SYSDIR}/sysroot --disable-nls \
 	             --disable-static --disable-werror --enable-64-bit-bfd
 	make configure-host
-	make 
+	make -j8
 	make install
 	cp -v ../include/libiberty.h ${SYSDIR}/sysroot/usr/include
 popd
@@ -503,9 +506,9 @@ popd
 　　GCC需要进行扩充式移植的软件包，在没有软件官方支持的情况下需要专门的获取代码的方式进行，以下是获取方式：
 
 ```sh
-git clone https://github.com/loongson/gcc.git -b loongarch_upstream --depth 1
+git clone https://github.com/loongson/gcc.git -b loongarch_upstream_v3 --depth 1
 pushd gcc
-    git archive --format=tar --output ../gcc-12.0.0.tar "loongarch_upstream"
+    git archive --format=tar --output ../gcc-12.0.0.tar "loongarch_upstream_v3"
 popd
 mkdir gcc-12.0.0
 pushd gcc-12.0.0
@@ -520,7 +523,6 @@ tar -czf ${DOWNLOADDIR}/gcc-12.0.0.tar.gz gcc-12.0.0
 ```sh
 tar xvf ${DOWNLOADDIR}/gcc-12.0.0.tar.gz -C ${BUILDDIR} 
 pushd ${BUILDDIR}/gcc-12.0.0
-	patch -Np1 -i ${DOWNLOADDIR}/gcc-12-loongarch-fix-ldso_name-2.patch
 	mkdir build
 	pushd build
 		AR=ar LDFLAGS="-Wl,-rpath,${SYSDIR}/cross-tools/lib" \
@@ -533,7 +535,7 @@ pushd ${BUILDDIR}/gcc-12.0.0
 		             --disable-libsanitizer --disable-libquadmath --disable-threads \
 		             --disable-target-zlib \
 		             --with-system-zlib --enable-checking=release \
-		             --with-abi=${MABI} --with-fix-loongson3-llsc \
+		             --with-abi=${MABI} --with-fix-loongson3-llsc --with-arch=loongarch64 \
 		             --enable-languages=c
 		make all-gcc all-target-libgcc
 		make install-gcc install-target-libgcc
@@ -570,11 +572,9 @@ tar -czf ${DOWNLOADDIR}/glibc-2.34.tar.gz glibc-2.34
 ```sh
 tar xvf ${DOWNLOADDIR}/glibc-2.34.tar.gz -C ${BUILDDIR}
 pushd ${BUILDDIR}/glibc-2.34
-    patch -Np1 -i ${DOWNLOADDIR}/glibc-2.33-fix-ldso_name.patch
-    patch -Np1 -i ${DOWNLOADDIR}/glibc-2.34-fix-setjmp.patch
     mkdir -v build-64
     pushd build-64
-	    BUILD_CC="gcc" CC="${CROSS_TARGET}-gcc ${BUILD64}" \
+	BUILD_CC="gcc" CC="${CROSS_TARGET}-gcc ${BUILD64}" \
         CXX="${CROSS_TARGET}-gcc ${BUILD64}" \
         AR="${CROSS_TARGET}-ar" RANLIB="${CROSS_TARGET}-ranlib" \
         ../configure --prefix=/usr --host=${CROSS_TARGET} --build=${CROSS_HOST} \
@@ -582,7 +582,8 @@ pushd ${BUILDDIR}/glibc-2.34
 	                 --with-binutils=${SYSDIR}/cross-tools/bin \
 	                 --with-headers=${SYSDIR}/sysroot/usr/include \
 	                 --enable-stack-protector=strong --enable-add-ons \
-	                 --disable-werror libc_cv_slibdir=/usr/lib64
+	                 --disable-werror libc_cv_slibdir=/usr/lib64 \
+			 --with-abi=${MABI}
 		make
 		make DESTDIR=${SYSDIR}/sysroot install
 	popd
@@ -592,12 +593,11 @@ popd
 
 ### 3.8 交叉编译器之GCC（完整版）
 　　完成目标系统的Glibc之后就可以着手制作交叉工具链中完整版的GCC了，制作步骤如下：
-
+#该gcc是用于在x86平台可以交叉编译loongarch的软件包，并非可以在loongarch上使用的gcc,后边还需要通过该gcc交叉编译一次gcc，第三次编译的gcc才可以在loongarch上使用
 ```sh
+#注意本次编译需要使用到上边新编译出来不完整的gcc
 tar xvf ${DOWNLOADDIR}/gcc-12.0.0.tar.gz -C ${BUILDDIR} 
 pushd ${BUILDDIR}/gcc-12.0.0
-	patch -Np1 -i ${DOWNLOADDIR}/gcc-12-loongarch-fix-ldso_name-2.patch
-	sed -i "/cfenv/d" libstdc++-v3/src/c++17/*.cc
 	mkdir build-all
 	pushd build-all
 		AR=ar LDFLAGS="-Wl,-rpath,${SYSDIR}/cross-tools/lib" \
@@ -613,6 +613,12 @@ pushd ${BUILDDIR}/gcc-12.0.0
 		make install
 	popd
 popd
+#注意编译过程中可能会出现找不到crti.o
+#但是crti.o在实际环境中已经存在
+#lauser:/opt/mylaos/build/gcc-loongarch_upstream_v3/build-all$ find ${SYSDIR}/sysroot -name crti.o
+#/opt/mylaos/sysroot/usr/lib64/crti.o
+#可通过创建软链接方式进行解决
+#ln -s /opt/mylaos/sysroot/usr/lib64 /opt/mylaos/sysroot/usr/lib
 ```
 
 在完成目标系统的Glibc之后就可以增加和修改一些编译参数了，主要是如下：  
@@ -720,9 +726,9 @@ popd
 　　Grub2需要进行扩充式移植的软件包，在没有软件官方支持的情况下需要专门的获取代码的方式进行，以下是获取方式：
 
 ```sh
-git clone -b "dev-la64" https://github.com/loongarch64/grub.git
+git clone -b "dev-la64-2.06" https://github.com/loongarch64/grub.git
 pushd grub
-    git archive --format=tar --output ../grub-2.06.tar "dev-la64"
+    git archive --format=tar --output ../grub-2.06.tar "dev-la64-2.06"
     ./bootstrap
     pushd gnulib
         git archive --format=tar --output ../../gnulib.tar HEAD
@@ -744,9 +750,6 @@ tar -czf ${DOWNLOADDIR}/grub-2.06.tar.gz grub-2.06
 ```sh
 tar -xvf ${DOWNLOADDIR}/grub-2.06.tar.gz -C ${BUILDDIR}
 pushd ${BUILDDIR}/grub-2.06
-    patch -Np1 -i ${DOWNLOADDIR}/grub-2.06-loongarch-li_to_liw.patch
-    patch -Np1 -i ${DOWNLOADDIR}/grub-2.06-fix-initrd.patch
-    sed -i "s@-march=loongarch @@g" Makefile.in conf/Makefile.common grub-core/Makefile.in
 	mkdir build
 	pushd build
 		TARGET_CC="${CROSS_TARGET}-gcc" \
@@ -840,8 +843,8 @@ popd
 
 ##### Iana-Etc
 ```sh
-tar xvf ${DOWNLOADDIR}/iana-etc-20210407.tar.gz -C ${BUILDDIR}
-pushd ${BUILDDIR}/iana-etc-20210407
+tar xvf ${DOWNLOADDIR}/iana-etc-20210526.tar.gz -C ${BUILDDIR}
+pushd ${BUILDDIR}/iana-etc-20210526
 	cp services protocols ${SYSDIR}/sysroot/etc
 popd
 ```
@@ -900,8 +903,8 @@ popd
 　　这次编译的Binutils是目标系统中使用的，在交叉编译阶段不会使用到它。
 
 ```sh
-tar xvf ${DOWNLOADDIR}/binutils-2.37.tar.gz -C ${BUILDDIR}
-pushd ${BUILDDIR}/binutils-2.37
+tar xvf ${DOWNLOADDIR}/binutils-3.1.tar.gz -C ${BUILDDIR}
+pushd ${BUILDDIR}/binutils-3.1
 	rm -rf gdb* libdecnumber readline sim
 	mkdir build
 	pushd build
@@ -920,9 +923,7 @@ popd
 ```sh
 tar xvf ${DOWNLOADDIR}/gcc-12.0.0.tar.gz -C ${BUILDDIR} 
 pushd ${BUILDDIR}/gcc-12.0.0
-	patch -Np1 -i ${DOWNLOADDIR}/gcc-12-loongarch-fix-ldso_name-2.patch
-	sed -i "/cfenv/d" libstdc++-v3/src/c++17/*.cc
-	sed -i 's@\./fixinc\.sh@-c true@' gcc/Makefile.in
+#	sed -i "/cfenv/d" libstdc++-v3/src/c++17/*.cc
 	mkdir build
 	pushd build
 		../configure --prefix=/usr --libdir=/usr/lib64 --build=${CROSS_HOST} \
@@ -942,7 +943,37 @@ popd
 ```
 
 　　因在目标系统中使用，所以编译的完整一些，将C、C++以及Fortran等语言的支持加上。
+注意：编译过程中可能会报错，类似:https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
+解决方法1：sed -i "/cfenv/d" libstdc++-v3/src/c++17/*.cc
+解决方法2：
+```sh
+diff --git a/configure b/configure
+index 6157a8c87fb..2a4a05b4edf 100755
+--- a/configure
++++ b/configure
+@@ -16653,7 +16653,7 @@ else
+ fi
 
+
+-RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET"
++RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET -nostdinc++"
+
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking where to find the target ar" >&5
+ $as_echo_n "checking where to find the target ar... " >&6; }
+diff --git a/configure.ac b/configure.ac
+index 2ff48941754..01ecc8c42d9 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -3515,7 +3515,7 @@ ACX_CHECK_INSTALLED_TARGET_TOOL(STRIP_FOR_TARGET, strip)
+ ACX_CHECK_INSTALLED_TARGET_TOOL(WINDRES_FOR_TARGET, windres)
+ ACX_CHECK_INSTALLED_TARGET_TOOL(WINDMC_FOR_TARGET, windmc)
+
+-RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET"
++RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET -nostdinc++"
+
+ GCC_TARGET_TOOL(ar, AR_FOR_TARGET, AR, [binutils/ar])
+ GCC_TARGET_TOOL(as, AS_FOR_TARGET, AS, [gas/as-new])
+```
 #### Bzip2
 ```sh
 tar xvf ${DOWNLOADDIR}/bzip2-1.0.8.tar.gz -C ${BUILDDIR}
@@ -1081,7 +1112,7 @@ popd
 
 #### Attr
 ```sh
-tar xvf ${DOWNLOADDIR}/attr-2.5.1.tar.xz -C ${BUILDDIR}
+tar xvf ${DOWNLOADDIR}/attr-2.5.1.tar.gz -C ${BUILDDIR}
 pushd ${BUILDDIR}/attr-2.5.1
 	./configure --prefix=/usr --libdir=/usr/lib64 --build=${CROSS_HOST} \
 	            --host=${CROSS_TARGET} --disable-static --sysconfdir=/etc
@@ -1295,8 +1326,8 @@ popd
 
 #### Expat
 ```sh
-tar xvf ${DOWNLOADDIR}/expat-2.3.0.tar.xz -C ${BUILDDIR}
-pushd ${BUILDDIR}/expat-2.3.0
+tar xvf ${DOWNLOADDIR}/expat-2.4.1.tar.xz -C ${BUILDDIR}
+pushd ${BUILDDIR}/expat-2.4.1
 	./configure --prefix=/usr --libdir=/usr/lib64 --build=${CROSS_HOST} \
 	            --host=${CROSS_TARGET} 
 	make
@@ -1466,8 +1497,8 @@ popd
 
 #### Less
 ```sh
-tar xvf ${DOWNLOADDIR}/less-581.2.tar.gz -C ${BUILDDIR}
-pushd ${BUILDDIR}/less-581.2
+tar xvf ${DOWNLOADDIR}/less-581.tar.gz -C ${BUILDDIR}
+pushd ${BUILDDIR}/less-581
 	./configure --prefix=/usr --sysconfdir=/etc --build=${CROSS_HOST} --host=${CROSS_TARGET}
 	make
 	make DESTDIR=${SYSDIR}/sysroot install
@@ -1638,7 +1669,7 @@ pushd ${BUILDDIR}/vim-8.2.2879
 	vim_cv_tgetent=zero
 	vim_cv_stat_ignores_slash=no
 	vim_cv_memmove_handles_overlap=yes
-	EOF
+EOF
 	./configure --prefix=/usr --build=${CROSS_HOST} --host=${CROSS_TARGET}  --with-tlib=ncurses
 	make
 	make DESTDIR=${SYSDIR}/sysroot STRIP=${CROSS_TARGET}-strip install
