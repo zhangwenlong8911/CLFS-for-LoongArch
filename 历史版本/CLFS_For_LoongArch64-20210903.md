@@ -1043,7 +1043,7 @@ pushd ${BUILDDIR}/readline-8.1
 popd
 ```
 
-　　因交叉编译的原因，Redaline的配置脚本无法正确的探测目标系统中安装的Ncurses软件包，因此在配置中加入```--with-curses```参数保证加入Ncurses的支持以及在编译阶段加入```SHLIB_LIBS="-lncursesw"```以保证正确链接库文件。
+　　因交叉编译的原因，Readline的配置脚本无法正确的探测目标系统中安装的Ncurses软件包，因此在配置中加入```--with-curses```参数保证加入Ncurses的支持以及在编译阶段加入```SHLIB_LIBS="-lncursesw"```以保证正确链接库文件。
 
 #### M4
 ```sh
@@ -2820,7 +2820,7 @@ export JOBS="-j8"
 　　这里设置了2个环境变量：
 
 　　“COMMON_CONFIG":用来为配置软件包提供通用参数。  
-　　“JBOS”：用来给make命令提供并行编译的数量设置。
+　　“JOBS”：用来给make命令提供并行编译的数量设置。
 
 #### Util-Macros
 https://www.x.org/archive//individual/util/util-macros-1.19.3.tar.gz
